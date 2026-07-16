@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creatio Text Cleaner Ultimate</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Стилізація скролбарів */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        /* Плейсхолдер для contenteditable */
+        [contenteditable=true]:empty:before {
+            content: attr(placeholder);
+            pointer-events: none;
+            display: block;
+            color: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-6 flex flex-col justify-between font-sans overflow-hidden">
+
+    <!-- Головний монолітний контейнер -->
+    <div class="max-w-6xl mx-auto w-full bg-slate-900/80 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-800 p-5">
+        
+        <!-- Шапка сайту з вбудованим інструментарієм -->
+        <header class="mb-4 border-b border-slate-800 pb-3 flex flex-wrap justify-between items-center gap-3">
+            <div class="flex flex-wrap items-center gap-4">
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-transparent">
+                        Creatio Cleaner Ultimate
+                    </h1>
+                </div>
+
+                <!-- 🛠 ДИНАМІЧНИЙ ПУЛЬТ КЕРУВАННЯ -->
+                <div id="toolbar" class="hidden flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-850 text-xs transition-all duration-300">
+                    <!-- Пошук ПІБ -->
+                    <div class="relative flex items-center">
+                        <input type="text" id="searchInput" placeholder="🔍 Швидкий пошук ПІБ..."
+                            class="bg-slate-900 border border-slate-800 focus:border-teal-500 rounded-lg pl-3 pr-2 py-1 text-slate-200 focus:outline-none w-44 transition-all text-xs font-sans">
+                    </div>
+                    
+                    <!-- Покроковий перегляд зв'язків -->
+                    <button onclick="startVerification()" id="verifyBtn" 
+                        class="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 rounded-lg border border-teal-500/20 font-bold transition-all">
+                        👁️ Зв'язки
+                    </button>
+
+                    <!-- Навігація зв'язків -->
+                    <div id="verifyNav" class="hidden flex items-center gap-1.5 border-l border-slate-800 pl-2">
+                        <button onclick="prevVerify()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-bold text-[10px] transition-all">◀</button>
+                        <span id="verifyCounter" class="font-mono text-slate-400 text-[10px] min-w-[35px] text-center">0/0</span>
+                        <button onclick="nextVerify()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-bold text-[10px] transition-all">▶</button>
+                        <button onclick="stopVerification()" class="ml-1 p-1 hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 rounded transition-all" title="Закрити режим перевірки">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Кнопка логу -->
+            <button onclick="toggleDrawer(true)" 
+                class="px-3.5 py-1.5 bg-slate-855 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-800 transition-all flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                Лог видалення
+                <span id="removedBadge" class="bg-rose-500/20 text-rose-400 px-1.5 py-0.2 rounded text-[10px] font-mono">0</span>
+            </button>
+        </header>
+
+        <!-- Двоколонковий макет -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- 1. Ліва колонка: Вхідні дані -->
+            <div class="flex flex-col space-y-2">
+                <div class="flex justify-between items-center text-xs font-bold text-slate-400">
+                    <label>1. Оригінал з Google Таблиці:</label>
+                    <span id="rawCount" class="font-mono text-slate-500">0 рядків</span>
+                </div>
+                <div class="relative group">
+                    <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-teal-500 rounded-xl blur opacity-10 group-focus-within:opacity-20 transition duration-250"></div>
+                    <div id="rawInput" contenteditable="true" placeholder="Встав оригінал сюди..." 
+                        class="relative w-full h-[360px] p-4 bg-slate-950/90 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 font-mono text-base leading-relaxed overflow-y-auto resize-none transition-all"
+                        oninput="updateRawCount()"></div>
+                </div>
+            </div>
+
+            <!-- 2. Права колонка: Результат -->
+            <div class="flex flex-col space-y-2">
+                <div class="flex justify-between items-center text-xs font-bold text-slate-400">
+                    <label>2. Готовий рядок (для Creatio):</label>
+                    <span id="cleanCount" class="text-emerald-400 font-mono">0 чол.</span>
+                </div>
+                <div class="relative group">
+                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl blur opacity-10 group-focus-within:opacity-20 transition duration-250"></div>
+                    <div id="cleanOutput" class="relative w-full h-[360px] p-4 bg-slate-950/90 border border-slate-800 rounded-xl text-emerald-400/90 focus:outline-none font-mono text-base leading-relaxed overflow-y-auto resize-none transition-all whitespace-normal"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Нижня панель дій -->
+        <div class="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap gap-3 justify-between items-center">
+            
+            <button onclick="processText()" 
+                class="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.98] text-slate-950 font-extrabold text-sm rounded-xl shadow-md transition-all flex items-center gap-2">
+                ⚡ Форматувати
+            </button>
+            
+            <div class="flex gap-3">
+                <button onclick="copyToClipboard()" id="copyBtn" disabled
+                    class="px-5 py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-slate-800 active:scale-[0.98] text-white font-bold text-sm rounded-xl border border-slate-700 transition-all flex items-center gap-2">
+                    📋 Скопіювати у ""
+                </button>
+                <button onclick="clearAll()" 
+                    class="px-4 py-3 bg-rose-600/10 hover:bg-rose-600/20 border border-rose-500/10 text-rose-400 text-sm font-bold rounded-xl transition-all">
+                    Скинути
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ================= SIDEBAR DRAWER (Висувна шторка) ================= -->
+    <div id="drawerOverlay" onclick="toggleDrawer(false)" 
+        class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 transition-opacity duration-200 opacity-0 pointer-events-none">
+    </div>
+
+    <div id="drawer" 
+        class="fixed inset-y-0 right-0 w-full max-w-sm bg-slate-900 border-l border-slate-800 shadow-2xl z-50 transform translate-x-full transition-transform duration-200 ease-in-out flex flex-col">
+        
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+            <div>
+                <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                    Лог фільтрації
+                </h3>
+            </div>
+            <button onclick="toggleDrawer(false)" class="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition-all text-xs">
+                ✕ Закрити
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-[11px]" id="removedList">
+            <div class="text-slate-500 text-center py-6">Тут відобразяться видалені рядки...</div>
+        </div>
+    </div>
+
+    <footer class="text-center text-slate-600 text-[11px] mt-4">
+        Creatio Utility Tool • Ultimate 3.1 • 2026
+    </footer>
+
+    <!-- JS Логіка -->
+    <script>
+        let parsedPairs = [];
+        let currentVerifyIndex = -1;
+        let activeHighlightPair = null;
+
+        // Очищення HTML при вставці тексту
+        document.getElementById('rawInput').addEventListener('paste', function(e) {
+            e.preventDefault();
+            const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+            document.execCommand('insertText', false, text);
+        });
+
+        // Скидання інтерактивного вигляду при фокусі
+        document.getElementById('rawInput').addEventListener('focus', function() {
+            if (this.querySelector('[id^="raw-pair-"]') || this.querySelector('.line-through')) {
+                const rawText = parsedPairs.map(p => `${p.rawOriginal}`).join('\n');
+                this.innerText = rawText;
+                stopVerification();
+                document.getElementById('toolbar').classList.add('hidden');
+            }
+        });
+
+        function toggleDrawer(open) {
+            const drawer = document.getElementById('drawer');
+            const overlay = document.getElementById('drawerOverlay');
+            if (open) {
+                drawer.classList.remove('translate-x-full');
+                overlay.classList.remove('opacity-0', 'pointer-events-none');
+                overlay.classList.add('opacity-100');
+            } else {
+                drawer.classList.add('translate-x-full');
+                overlay.classList.remove('opacity-100');
+                overlay.classList.add('opacity-0', 'pointer-events-none');
+            }
+        }
+
+        function updateRawCount() {
+            const input = document.getElementById('rawInput').innerText;
+            const count = input.trim() ? input.split('\n').length : 0;
+            document.getElementById('rawCount').innerText = `${count} рядків`;
+        }
+
+        function processText() {
+            const input = document.getElementById('rawInput').innerText;
+            const lines = input.split('\n');
+            parsedPairs = [];
+            
+            const rawHTML = [];
+            const resultHTML = [];
+            const removedLog = [];
+            let pairCounter = 0;
+
+            for (let rawLine of lines) {
+                const line = rawLine.trim();
+                if (!line) {
+                    rawHTML.push(`<div class="text-slate-600 italic leading-relaxed">◦ Порожній рядок</div>`);
+                    removedLog.push(`<div class="text-slate-600 italic">◦ Порожній рядок</div>`);
+                    continue;
+                }
+
+                const lowerLine = line.toLowerCase();
+                
+                if (lowerLine.startsWith('команда') || 
+                    lowerLine.startsWith('піб') || 
+                    lowerLine.startsWith('всього') ||
+                    /\b\d{2}\.\d{2}\b/.test(line)) {
+                    rawHTML.push(`<div class="text-rose-500/40 line-through leading-relaxed">❌ ${line}</div>`);
+                    removedLog.push(`<div class="text-rose-400 bg-rose-950/20 border border-rose-900/20 p-2 rounded-lg">❌ Видалено: <strong>${line}</strong></div>`);
+                    continue;
+                }
+
+                const match = line.match(/^(.+?)\s+(\d+)$/);
+                if (match) {
+                    const name = match[1].trim();
+                    const num = match[2].trim();
+                    
+                    parsedPairs.push({ name, num, pairIndex: pairCounter, rawOriginal: line });
+
+                    rawHTML.push(`<div id="raw-pair-${pairCounter}" class="transition-all duration-150 rounded leading-relaxed px-1">${line}</div>`);
+                    resultHTML.push(`<span id="clean-pair-${pairCounter}" class="transition-all duration-150 px-1 rounded inline-block">${name}=${num}</span>`);
+                    pairCounter++;
+                } else {
+                    rawHTML.push(`<div class="text-amber-500/50 leading-relaxed">⚠️ ${line}</div>`);
+                    removedLog.push(`<div class="text-amber-400 bg-amber-950/20 border border-amber-900/20 p-2 rounded-lg">⚠️ Формат?: <span>${line}</span></div>`);
+                }
+            }
+
+            // Формуємо фінальний рядок з обов'язковою КРАПКОЮ З КОМОЮ в самому кінці рядка
+            const outputText = parsedPairs.length > 0 
+                ? parsedPairs.map(p => `${p.name}=${p.num}`).join(';') + ';' 
+                : '';
+
+            // Рендеримо інтерактивні версії
+            document.getElementById('rawInput').innerHTML = rawHTML.join('');
+            
+            // Відображаємо з крапкою з комою в кінці результату
+            document.getElementById('cleanOutput').innerHTML = resultHTML.join('<span class="text-slate-600">;</span>') + (parsedPairs.length > 0 ? '<span class="text-slate-500">;</span>' : '');
+            
+            document.getElementById('removedList').innerHTML = removedLog.length ? removedLog.join('\n') : `<div class="text-slate-500 text-center py-6">Нічого не видалено.</div>`;
+            
+            // Оновлення лічильників
+            document.getElementById('cleanCount').innerText = `${parsedPairs.length} чол.`;
+            document.getElementById('removedBadge').innerText = removedLog.length;
+            document.getElementById('copyBtn').disabled = parsedPairs.length === 0;
+
+            if (parsedPairs.length > 0) {
+                document.getElementById('toolbar').classList.remove('hidden');
+            } else {
+                document.getElementById('toolbar').classList.add('hidden');
+            }
+            
+            stopVerification();
+        }
+
+        // --- 🔍 ПІДСВІТКА ТА ПОШУКУ ---
+
+        function highlightPair(idx) {
+            if (activeHighlightPair !== null) {
+                const prevRaw = document.getElementById(`raw-pair-${activeHighlightPair}`);
+                const prevClean = document.getElementById(`clean-pair-${activeHighlightPair}`);
+                if (prevRaw) prevRaw.className = "transition-all duration-150 rounded leading-relaxed px-1";
+                if (prevClean) prevClean.className = "transition-all duration-150 px-1 rounded inline-block";
+            }
+
+            activeHighlightPair = idx;
+
+            const rawEl = document.getElementById(`raw-pair-${idx}`);
+            const cleanEl = document.getElementById(`clean-pair-${idx}`);
+
+            if (rawEl && cleanEl) {
+                rawEl.className = "bg-blue-500/30 text-blue-200 border-l-4 border-blue-500 pl-2 py-0.5 rounded-r font-bold transition-all duration-150";
+                cleanEl.className = "bg-emerald-500/35 text-emerald-200 px-1.5 py-0.5 rounded border border-emerald-500/40 font-bold transition-all duration-150";
+
+                rawEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                cleanEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        // Пошук ПІБ
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const query = e.target.value.trim().toLowerCase();
+            if (!query) {
+                stopVerification();
+                return;
+            }
+
+            const matchIndex = parsedPairs.findIndex(p => p.name.toLowerCase().includes(query));
+            if (matchIndex !== -1) {
+                highlightPair(matchIndex);
+                this.className = "bg-slate-900 border border-emerald-500 focus:border-emerald-400 rounded-lg pl-3 pr-2 py-1 text-emerald-300 focus:outline-none w-44 transition-all text-xs font-sans";
+            } else {
+                this.className = "bg-slate-900 border border-rose-500 focus:border-rose-400 rounded-lg pl-3 pr-2 py-1 text-rose-300 focus:outline-none w-44 transition-all text-xs font-sans";
+            }
+        });
+
+        // Перевірка
+        function startVerification() {
+            if (parsedPairs.length === 0) return;
+            document.getElementById('verifyNav').classList.remove('hidden');
+            currentVerifyIndex = 0;
+            updateVerifyUI();
+        }
+
+        function stopVerification() {
+            document.getElementById('verifyNav').classList.add('hidden');
+            if (activeHighlightPair !== null) {
+                const prevRaw = document.getElementById(`raw-pair-${activeHighlightPair}`);
+                const prevClean = document.getElementById(`clean-pair-${activeHighlightPair}`);
+                if (prevRaw) prevRaw.className = "transition-all duration-150 rounded leading-relaxed px-1";
+                if (prevClean) prevClean.className = "transition-all duration-150 px-1 rounded inline-block";
+                activeHighlightPair = null;
+            }
+            currentVerifyIndex = -1;
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchInput').className = "bg-slate-900 border border-slate-800 focus:border-teal-500 rounded-lg pl-3 pr-2 py-1 text-slate-200 focus:outline-none w-44 transition-all text-xs font-sans";
+        }
+
+        function nextVerify() {
+            if (parsedPairs.length === 0) return;
+            currentVerifyIndex = (currentVerifyIndex + 1) % parsedPairs.length;
+            updateVerifyUI();
+        }
+
+        function prevVerify() {
+            if (parsedPairs.length === 0) return;
+            currentVerifyIndex = (currentVerifyIndex - 1 + parsedPairs.length) % parsedPairs.length;
+            updateVerifyUI();
+        }
+
+        function updateVerifyUI() {
+            document.getElementById('verifyCounter').innerText = `${currentVerifyIndex + 1}/${parsedPairs.length}`;
+            highlightPair(currentVerifyIndex);
+        }
+
+        // --- КУПІЮВАННЯ ТА СКИДАННЯ ---
+
+        function copyToClipboard() {
+            if (parsedPairs.length === 0) return;
+
+            // Збираємо чистий текст та додаємо в кінці ";"
+            const textToCopy = parsedPairs.map(p => `${p.name}=${p.num}`).join(';') + ';';
+            const quotedText = `"${textToCopy}"`;
+
+            navigator.clipboard.writeText(quotedText).then(() => {
+                const copyBtn = document.getElementById('copyBtn');
+                copyBtn.innerHTML = '✅ Скопійовано!';
+                copyBtn.classList.replace('bg-slate-800', 'bg-emerald-600');
+                copyBtn.classList.replace('border-slate-700', 'border-emerald-500');
+                
+                setTimeout(() => {
+                    copyBtn.innerHTML = '📋 Скопіювати у ""';
+                    copyBtn.classList.replace('bg-emerald-600', 'bg-slate-800');
+                    copyBtn.classList.replace('border-emerald-500', 'border-slate-700');
+                }, 1500);
+            }).catch(err => {
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = quotedText;
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempTextArea);
+            });
+        }
+
+        function clearAll() {
+            document.getElementById('rawInput').innerText = '';
+            document.getElementById('cleanOutput').innerText = '';
+            document.getElementById('removedList').innerHTML = `<div class="text-slate-500 text-center py-6">Тут відобразяться видалені рядки...</div>`;
+            document.getElementById('rawCount').innerText = '0 рядків';
+            document.getElementById('cleanCount').innerText = '0 чол.';
+            document.getElementById('removedBadge').innerText = '0';
+            document.getElementById('copyBtn').disabled = true;
+            document.getElementById('toolbar').classList.add('hidden');
+            stopVerification();
+        }
+    </script>
+</body>
+</html>
